@@ -3,468 +3,459 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Anniversary Road Trip</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>Neon City Drive</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #f0f0f0; touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        /* CAR HUD CONTROLS (Mobile) */
-        .control-btn {
-            background: rgba(0,0,0,0.1); border: 2px solid rgba(0,0,0,0.2);
-            border-radius: 12px; backdrop-filter: blur(4px);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; color: #333; user-select: none;
-            transition: background 0.1s, transform 0.1s;
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        #game-container { position: relative; width: 100vw; height: 100vh; }
+
+        /* --- UI LAYER --- */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        /* Minimap */
+        #minimap-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffcc;
+            border-radius: 50%; /* Circular Map */
+            overflow: hidden;
+            z-index: 10;
         }
-        .control-btn:active { background: rgba(0,0,0,0.3); transform: scale(0.95); }
-        
-        /* Layout for controls */
-        #controls-area {
-            display: none; /* Hidden on desktop initially */
-            position: absolute; bottom: 20px; left: 0; right: 0; height: 140px;
-            padding: 0 20px; pointer-events: none;
-        }
-        .pointer-events-auto { pointer-events: auto; }
-        
-        @media (pointer: coarse) {
-            #controls-area { display: flex; justify-content: space-between; }
+        #minimap-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
 
-        /* Instructions */
-        .key-badge {
-            display: inline-block; padding: 2px 6px; border-radius: 4px;
-            background: #ddd; border-bottom: 2px solid #bbb; font-size: 10px; font-weight: bold; color: #555;
+        /* Speedometer */
+        #speedometer {
+            position: absolute;
+            top: 20px;
+            left: 190px; /* Next to minimap */
+            color: #fff;
+            font-size: 24px;
+            font-weight: 900;
+            text-shadow: 2px 2px 0 #000;
+            font-style: italic;
         }
 
-        /* Checkpoint Pulse Animation */
-        @keyframes pulse-ring {
-            0% { transform: scale(0.8); opacity: 0.5; }
-            100% { transform: scale(1.5); opacity: 0; }
+        /* Controls */
+        #joystick-zone {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            width: 120px;
+            height: 120px;
+            pointer-events: auto;
+        }
+
+        /* Exit Button - Fixed for Mobile */
+        #exit-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(to bottom, #ff3333, #aa0000);
+            color: white;
+            border: 2px solid white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            pointer-events: auto;
+            text-transform: uppercase;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 9999; /* Ensure it's on top */
+            -webkit-tap-highlight-color: transparent;
+        }
+        #exit-btn:active { transform: scale(0.95); }
+
+        /* Start Overlay */
+        #overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 40px;
+            border-radius: 10px;
+            border: 1px solid #00ffcc;
+            pointer-events: auto;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
 </head>
 <body>
 
-    <div id="start-screen" class="fixed inset-0 z-50 bg-[#e0e7ff] flex flex-col items-center justify-center transition-opacity duration-500">
-        <h1 class="text-4xl md:text-6xl font-bold text-indigo-900 tracking-tighter mb-2">ROAD TRIP</h1>
-        <p class="text-indigo-600 mb-8 tracking-widest uppercase text-xs">Year Two Anniversary Edition</p>
+<div id="game-container">
+    <div id="ui-layer">
+        <div id="minimap-container">
+            <canvas id="minimap-canvas"></canvas>
+        </div>
+        <div id="speedometer">0 KM/H</div>
+        <button id="exit-btn" onclick="closeGame()">EXIT CITY</button>
+        <div id="joystick-zone"></div>
         
-        <div class="bg-white p-6 rounded-xl shadow-xl max-w-sm w-full mx-4 mb-8">
-            <h3 class="font-bold text-gray-700 mb-2">How to Play:</h3>
-            <ul class="text-sm text-gray-500 space-y-2">
-                <li>🚗 Drive the car to explore the map.</li>
-                <li>📍 Find the <strong>Glowing Zones</strong>.</li>
-                <li>🛑 <strong>Park</strong> inside them to unlock a memory.</li>
-            </ul>
-        </div>
-
-        <button id="start-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold py-4 px-12 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95">
-            START ENGINE
-        </button>
-    </div>
-
-    <div id="ui-layer" class="absolute inset-0 pointer-events-none z-10 p-6 opacity-0 transition-opacity duration-1000">
-        <div class="flex justify-between items-start">
-            <div class="bg-white/80 backdrop-blur px-4 py-2 rounded-lg shadow-sm">
-                <p class="text-xs font-bold text-indigo-900">MEMORY MAP</p>
-            </div>
-            <div class="hidden md:block bg-white/80 backdrop-blur px-4 py-2 rounded-lg shadow-sm">
-                <p class="text-xs text-gray-500">
-                    <span class="key-badge">W</span> Gas 
-                    <span class="key-badge">S</span> Brake 
-                    <span class="key-badge">A</span> Left 
-                    <span class="key-badge">D</span> Right
-                </p>
-            </div>
-        </div>
-
-        <div id="park-alert" class="absolute top-1/4 left-1/2 -translate-x-1/2 bg-black/80 text-white px-6 py-2 rounded-full font-bold tracking-widest text-sm opacity-0 transition-all duration-300 transform scale-90">
-            PARKING...
+        <div id="overlay">
+            <h1>NEON CITY</h1>
+            <p>Drag Joystick to Drive.</p>
+            <p>Explore the city.</p>
+            <button onclick="startGame()" style="padding: 10px 30px; font-size: 18px; cursor: pointer; background: #00ffcc; border: none; font-weight: bold;">START ENGINE</button>
         </div>
     </div>
+</div>
 
-    <div id="controls-area">
-        <div class="flex gap-4 items-end pb-4">
-            <div id="btn-left" class="control-btn w-16 h-16 pointer-events-auto">←</div>
-            <div id="btn-right" class="control-btn w-16 h-16 pointer-events-auto">→</div>
-        </div>
-        <div class="flex gap-4 items-end pb-4">
-            <div id="btn-brake" class="control-btn w-16 h-16 pointer-events-auto bg-red-500/10 border-red-500/30 text-red-800">S</div>
-            <div id="btn-gas" class="control-btn w-16 h-20 pointer-events-auto bg-green-500/10 border-green-500/30 text-green-800">W</div>
-        </div>
-    </div>
+<script>
+    // --- 1. GLOBAL VARIABLES ---
+    const container = document.getElementById('game-container');
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    let scene, camera, renderer;
+    let minimapCtx;
+    let car, wheels = [];
+    let buildings = []; // Store building positions for minimap
+    let speed = 0;
+    let steering = 0;
+    
+    // Physics Config
+    const maxSpeed = 3.0;
+    const acceleration = 0.08;
+    const friction = 0.97;
+    const turnSpeed = 0.06;
 
-    <div id="modal" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0">
-        <div class="bg-white rounded-2xl overflow-hidden shadow-2xl max-w-md w-full transform scale-95 transition-transform duration-300" id="modal-content">
-            <div class="relative h-64 bg-gray-100">
-                <img id="modal-img" src="" class="w-full h-full object-cover">
-                <button onclick="closeModal()" class="absolute top-3 right-3 bg-white/90 text-gray-800 w-8 h-8 rounded-full font-bold shadow hover:bg-white">✕</button>
-            </div>
-            <div class="p-8">
-                <h2 id="modal-title" class="text-2xl font-bold text-gray-800 mb-2"></h2>
-                <div class="w-10 h-1 bg-indigo-500 mb-4"></div>
-                <p id="modal-desc" class="text-gray-600 leading-relaxed"></p>
-                <button onclick="closeModal()" class="w-full mt-6 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-lg transition">
-                    Back to Driving
-                </button>
-            </div>
-        </div>
-    </div>
+    // Audio
+    let audioCtx, engineOsc;
+    let gameActive = false;
 
-    <script>
-        // --- 1. DATA: EDIT YOUR MEMORIES HERE ---
-        const CHECKPOINTS = [
-            {
-                x: -15, z: -15, color: 0xFF6B6B, // Red Zone
-                img: "https://placehold.co/600x400/FF6B6B/FFF?text=First+Date",
-                title: "Where It Started",
-                desc: "Parked here to remember our first date. I was so nervous picking you up."
-            },
-            {
-                x: 15, z: -15, color: 0x4ECDC4, // Teal Zone
-                img: "https://placehold.co/600x400/4ECDC4/FFF?text=The+Trip",
-                title: "Road Trip",
-                desc: "Driving 500 miles just to see the ocean. Best weekend ever."
-            },
-            {
-                x: 15, z: 15, color: 0xFFD93D, // Yellow Zone
-                img: "https://placehold.co/600x400/FFD93D/FFF?text=Home",
-                title: "Building a Home",
-                desc: "Even when things got messy, we built something beautiful."
-            },
-            {
-                x: -15, z: 15, color: 0x6C5CE7, // Purple Zone
-                img: "https://placehold.co/600x400/6C5CE7/FFF?text=Future",
-                title: "The Future",
-                desc: "Buckle up. We have so many more places to go together."
+    // --- 2. TEXTURE GENERATORS (Procedural) ---
+    function createBuildingTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        // Base color (dark blue-grey)
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0,0,64,128);
+        // Windows (lit and unlit)
+        for(let y=10; y<120; y+=10) {
+            for(let x=5; x<60; x+=10) {
+                if(Math.random() > 0.3) {
+                    ctx.fillStyle = Math.random() > 0.8 ? '#ffffaa' : '#444455'; // Some lights on
+                    ctx.fillRect(x, y, 6, 8);
+                }
             }
-        ];
+        }
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter;
+        return tex;
+    }
 
-        // --- 2. ENGINE & SCENE SETUP ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf0f5ff); // Soft blue-ish white
-        scene.fog = new THREE.Fog(0xf0f5ff, 20, 60);
+    // --- 3. INIT ---
+    function init() {
+        // Scene Setup
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Day/Dusk Sky
+        scene.fog = new THREE.Fog(0x87CEEB, 200, 600); // Reduced fog, pushed far back
 
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        // Initial Camera Position (Isometric-ish)
-        camera.position.set(20, 20, 20);
-        
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        // Camera
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 10, -20);
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        document.body.appendChild(renderer.domElement);
+        container.appendChild(renderer.domElement);
 
-        // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
+        // Lighting
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        scene.add(hemiLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-        dirLight.position.set(50, 80, 30);
-        dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048;
-        dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.left = -50;
-        dirLight.shadow.camera.right = 50;
-        dirLight.shadow.camera.top = 50;
-        dirLight.shadow.camera.bottom = -50;
-        scene.add(dirLight);
+        const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+        sun.position.set(100, 200, 100);
+        sun.castShadow = true;
+        sun.shadow.camera.left = -200;
+        sun.shadow.camera.right = 200;
+        sun.shadow.camera.top = 200;
+        sun.shadow.camera.bottom = -200;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        scene.add(sun);
 
-        // --- 3. GAME OBJECTS ---
+        // --- WORLD GENERATION ---
+        createCity();
+        createCar();
 
-        // FLOOR
-        const floorGeo = new THREE.PlaneGeometry(200, 200);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0xeef2f3 });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
+        // --- CONTROLS ---
+        setupJoystick();
 
-        // DECORATION: Random Blocks (Buildings)
-        const cityGroup = new THREE.Group();
-        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-        const boxMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        // --- MINIMAP SETUP ---
+        minimapCtx = minimapCanvas.getContext('2d');
+
+        window.addEventListener('resize', onWindowResize, false);
+    }
+
+    function createCity() {
+        // 1. Ground (Asphalt)
+        const groundGeo = new THREE.PlaneGeometry(2000, 2000);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // 2. City Grid Generator
+        const blockSize = 80;
+        const streetWidth = 20;
+        const citySize = 10; // 10x10 blocks (Massive)
         
-        for(let i=0; i<40; i++) {
-            const h = Math.random() * 4 + 1;
-            const mesh = new THREE.Mesh(boxGeo, boxMat);
-            // Don't spawn near center (0,0)
-            let x = (Math.random() - 0.5) * 80;
-            let z = (Math.random() - 0.5) * 80;
-            if (Math.abs(x) < 5 && Math.abs(z) < 5) x += 10;
+        const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+        // Move pivot to bottom
+        buildingGeo.translate(0, 0.5, 0); 
+        const winTex = createBuildingTexture();
+        const buildingMat = new THREE.MeshStandardMaterial({ map: winTex });
+        const parkMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
 
-            mesh.position.set(x, h/2, z);
-            mesh.scale.set(Math.random()*2+1, h, Math.random()*2+1);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            cityGroup.add(mesh);
-        }
-        scene.add(cityGroup);
-
-        // THE CAR (Simple Low Poly)
-        const carGroup = new THREE.Group();
-        
-        // Body
-        const bodyGeo = new THREE.BoxGeometry(2, 0.8, 3.5);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4f46e5 }); // Indigo car
-        const carBody = new THREE.Mesh(bodyGeo, bodyMat);
-        carBody.position.y = 0.8;
-        carBody.castShadow = true;
-        carGroup.add(carBody);
-
-        // Cabin
-        const cabinGeo = new THREE.BoxGeometry(1.8, 0.6, 1.5);
-        const cabinMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-        const carCabin = new THREE.Mesh(cabinGeo, cabinMat);
-        carCabin.position.y = 1.5;
-        carCabin.position.z = -0.3;
-        carCabin.castShadow = true;
-        carGroup.add(carCabin);
-
-        // Wheels
-        const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.4, 16);
-        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-        const wheelPos = [
-            {x: 1.1, y: 0.4, z: 1}, {x: -1.1, y: 0.4, z: 1},
-            {x: 1.1, y: 0.4, z: -1.2}, {x: -1.1, y: 0.4, z: -1.2}
-        ];
-        wheelPos.forEach(p => {
-            const w = new THREE.Mesh(wheelGeo, wheelMat);
-            w.rotation.z = Math.PI / 2;
-            w.position.set(p.x, p.y, p.z);
-            w.castShadow = true;
-            carGroup.add(w);
-        });
-
-        // Headlights
-        const lightGeo = new THREE.SphereGeometry(0.2);
-        const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
-        const h1 = new THREE.Mesh(lightGeo, lightMat); h1.position.set(0.6, 0.8, 1.8);
-        const h2 = new THREE.Mesh(lightGeo, lightMat); h2.position.set(-0.6, 0.8, 1.8);
-        carGroup.add(h1, h2);
-
-        // Headlight Beams
-        const spotL = new THREE.SpotLight(0xffffee, 2, 20, 0.5, 0.5, 1);
-        spotL.position.set(0, 1, 1);
-        spotL.target.position.set(0, 0, 10);
-        carGroup.add(spotL);
-        carGroup.add(spotL.target);
-
-        scene.add(carGroup);
-
-
-        // CHECKPOINTS (Visuals)
-        const markers = [];
-        CHECKPOINTS.forEach(cp => {
-            const group = new THREE.Group();
-            group.position.set(cp.x, 0.05, cp.z);
-
-            // Ring
-            const ringGeo = new THREE.RingGeometry(2, 2.5, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: cp.color, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = -Math.PI / 2;
-            group.add(ring);
-
-            // Floating Icon
-            const iconGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-            const iconMat = new THREE.MeshBasicMaterial({ color: cp.color });
-            const icon = new THREE.Mesh(iconGeo, iconMat);
-            icon.position.y = 1;
-            // Animation data
-            icon.userData = { offset: Math.random() * 10 }; 
-            group.add(icon);
-
-            scene.add(group);
-            markers.push({ group, icon, data: cp, active: true });
-        });
-
-        // --- 4. CAR PHYSICS (Arcade Style) ---
-        const carState = {
-            speed: 0,
-            maxSpeed: 0.6,
-            acceleration: 0.015,
-            friction: 0.96,
-            turnSpeed: 0.04,
-            rotation: 0,
-            x: 0, 
-            z: 0,
-            vx: 0, 
-            vz: 0
-        };
-
-        const input = { up: false, down: false, left: false, right: false };
-
-        // Desktop Inputs
-        window.addEventListener('keydown', (e) => {
-            if(e.key === 'w' || e.key === 'ArrowUp') input.up = true;
-            if(e.key === 's' || e.key === 'ArrowDown') input.down = true;
-            if(e.key === 'a' || e.key === 'ArrowLeft') input.left = true;
-            if(e.key === 'd' || e.key === 'ArrowRight') input.right = true;
-        });
-
-        window.addEventListener('keyup', (e) => {
-            if(e.key === 'w' || e.key === 'ArrowUp') input.up = false;
-            if(e.key === 's' || e.key === 'ArrowDown') input.down = false;
-            if(e.key === 'a' || e.key === 'ArrowLeft') input.left = false;
-            if(e.key === 'd' || e.key === 'ArrowRight') input.right = false;
-        });
-
-        // Mobile Inputs
-        const bindTouch = (id, key) => {
-            const el = document.getElementById(id);
-            el.addEventListener('touchstart', (e) => { e.preventDefault(); input[key] = true; el.style.background = 'rgba(0,0,0,0.2)'; });
-            el.addEventListener('touchend', (e) => { e.preventDefault(); input[key] = false; el.style.background = ''; });
-        };
-        bindTouch('btn-gas', 'up');
-        bindTouch('btn-brake', 'down');
-        bindTouch('btn-left', 'left');
-        bindTouch('btn-right', 'right');
-
-        // --- 5. GAME LOOP ---
-        let isGameActive = false;
-        let parkingTimer = 0;
-        let activeCheckpoint = null;
-
-        function updateCar() {
-            if(!isGameActive) return;
-            if(document.getElementById('modal').classList.contains('hidden') === false) return; // Stop if modal open
-
-            // Acceleration
-            if (input.up) carState.speed += carState.acceleration;
-            if (input.down) carState.speed -= carState.acceleration;
-
-            // Friction
-            carState.speed *= carState.friction;
-
-            // Turning (only when moving)
-            if (Math.abs(carState.speed) > 0.01) {
-                const direction = carState.speed > 0 ? 1 : -1;
-                if (input.left) carState.rotation += carState.turnSpeed * direction;
-                if (input.right) carState.rotation -= carState.turnSpeed * direction;
-            }
-
-            // Apply Velocity
-            carState.vx = Math.sin(carState.rotation) * carState.speed;
-            carState.vz = Math.cos(carState.rotation) * carState.speed;
-
-            carState.x += carState.vx;
-            carState.z += carState.vz;
-
-            // Update Mesh
-            carGroup.position.set(carState.x, 0, carState.z);
-            carGroup.rotation.y = carState.rotation;
-        }
-
-        function updateCamera() {
-            // Smooth Camera Follow
-            const targetX = carState.x - Math.sin(carState.rotation) * 20; // 20 units behind
-            const targetZ = carState.z - Math.cos(carState.rotation) * 20;
-            
-            // Lerp camera position
-            camera.position.x += (targetX - camera.position.x) * 0.05 + 1; // +1 bias for angle
-            camera.position.z += (targetZ - camera.position.z) * 0.05;
-            camera.position.y = 15; // Constant height
-
-            camera.lookAt(carState.x, 0, carState.z);
-        }
-
-        function checkInteractions() {
-            let nearby = false;
-            const carPos = new THREE.Vector3(carState.x, 0, carState.z);
-
-            markers.forEach(marker => {
-                // Animate marker
-                marker.icon.rotation.y += 0.02;
-                marker.icon.position.y = 1 + Math.sin(Date.now() * 0.005 + marker.icon.userData.offset) * 0.2;
-
-                // Check distance
-                const dist = carPos.distanceTo(marker.group.position);
+        // Loop to create blocks
+        for(let x = -citySize; x <= citySize; x++) {
+            for(let z = -citySize; z <= citySize; z++) {
                 
-                if (dist < 3.5) {
-                    nearby = true;
-                    activeCheckpoint = marker.data;
+                // Keep center clear for start area
+                if(Math.abs(x) < 2 && Math.abs(z) < 2) continue;
 
-                    // Trigger parking logic
-                    if (Math.abs(carState.speed) < 0.1) {
-                        // Car is basically stopped
-                        parkingTimer++;
-                        const alert = document.getElementById('park-alert');
-                        alert.style.opacity = 1;
-                        alert.style.transform = 'scale(1) translateX(-50%)';
-                        
-                        if (parkingTimer > 60) { // 1 second park
-                            openModal(marker.data);
-                            parkingTimer = 0;
+                const centerX = x * blockSize;
+                const centerZ = z * blockSize;
+
+                // Randomly decide: Building Block or Park?
+                const isPark = Math.random() > 0.85;
+
+                if (isPark) {
+                    // Create Park (Low green block)
+                    const park = new THREE.Mesh(buildingGeo, parkMat);
+                    park.position.set(centerX, 0, centerZ);
+                    park.scale.set(blockSize - streetWidth, 0.5, blockSize - streetWidth);
+                    scene.add(park);
+                    // Add to minimap list
+                    buildings.push({x: centerX, z: centerZ, w: blockSize-streetWidth, h: blockSize-streetWidth, type: 'park'});
+                } else {
+                    // Create Cluster of Buildings in this block
+                    const subdiv = 2; // 2x2 buildings per block
+                    const subSize = (blockSize - streetWidth) / subdiv;
+                    
+                    for(let sx=0; sx<subdiv; sx++) {
+                        for(let sz=0; sz<subdiv; sz++) {
+                            // Random Height
+                            const height = 20 + Math.random() * 80;
+                            const bMesh = new THREE.Mesh(buildingGeo, buildingMat);
+                            
+                            const posX = centerX - ((blockSize-streetWidth)/2) + (sx * subSize) + subSize/2;
+                            const posZ = centerZ - ((blockSize-streetWidth)/2) + (sz * subSize) + subSize/2;
+
+                            bMesh.position.set(posX, 0, posZ);
+                            // Scale: width, height, depth (leave small gap between buildings)
+                            bMesh.scale.set(subSize - 2, height, subSize - 2);
+                            bMesh.castShadow = true;
+                            bMesh.receiveShadow = true;
+                            scene.add(bMesh);
+
+                            buildings.push({x: posX, z: posZ, w: subSize-2, h: subSize-2, type: 'building'});
                         }
-                    } else {
-                        parkingTimer = 0;
-                        document.getElementById('park-alert').style.opacity = 0;
                     }
                 }
-            });
-
-            if (!nearby) {
-                parkingTimer = 0;
-                document.getElementById('park-alert').style.opacity = 0;
             }
         }
+    }
 
-        function openModal(data) {
-            // Stop car
-            carState.speed = 0;
-            input.up = input.down = false;
+    function createCar() {
+        car = new THREE.Group();
 
-            const m = document.getElementById('modal');
-            document.getElementById('modal-img').src = data.img;
-            document.getElementById('modal-title').innerText = data.title;
-            document.getElementById('modal-desc').innerText = data.desc;
-            
-            m.classList.remove('hidden');
-            setTimeout(() => {
-                m.classList.remove('opacity-0');
-                document.getElementById('modal-content').classList.remove('scale-95');
-            }, 50);
-        }
+        // Car Body (Sports shape)
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0055, metalness: 0.7, roughness: 0.2 });
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1 });
 
-        window.closeModal = function() {
-            const m = document.getElementById('modal');
-            m.classList.add('opacity-0');
-            document.getElementById('modal-content').classList.add('scale-95');
-            setTimeout(() => m.classList.add('hidden'), 300);
-            
-            // Reset car position slightly to avoid instant re-trigger
-            // (Optional, or just require driving out)
-        }
+        // Main chassis
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 4.5), bodyMat);
+        chassis.position.y = 0.6;
+        chassis.castShadow = true;
+        car.add(chassis);
 
-        function animate() {
-            requestAnimationFrame(animate);
-            updateCar();
-            updateCamera();
-            checkInteractions();
-            renderer.render(scene, camera);
-        }
+        // Cabin
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 2.5), glassMat);
+        cabin.position.set(0, 1.1, -0.5);
+        car.add(cabin);
+        
+        // Hood scoop
+        const scoop = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 1), bodyMat);
+        scoop.position.set(0, 0.9, 1.5);
+        car.add(scoop);
 
-        // Start Logic
-        document.getElementById('start-btn').addEventListener('click', () => {
-            document.getElementById('start-screen').style.opacity = 0;
-            setTimeout(() => {
-                document.getElementById('start-screen').style.display = 'none';
-                isGameActive = true;
-            }, 500);
-            document.getElementById('ui-layer').style.opacity = 1;
+        // Wheels
+        const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.4, 24);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const positions = [ [-1.1, 1.5], [1.1, 1.5], [-1.1, -1.5], [1.1, -1.5] ];
+        
+        positions.forEach(p => {
+            const w = new THREE.Mesh(wheelGeo, wheelMat);
+            w.rotation.z = Math.PI / 2;
+            w.position.set(p[0], 0.4, p[1]);
+            w.castShadow = true;
+            car.add(w);
+            wheels.push(w);
         });
 
-        // Resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        // Headlights (Spotlights)
+        const leftLight = new THREE.SpotLight(0xffffff, 2, 60, 0.6, 0.5, 1);
+        leftLight.position.set(-0.8, 1, 2);
+        leftLight.target.position.set(-0.8, 0.5, 20);
+        car.add(leftLight);
+        car.add(leftLight.target);
+        
+        const rightLight = new THREE.SpotLight(0xffffff, 2, 60, 0.6, 0.5, 1);
+        rightLight.position.set(0.8, 1, 2);
+        rightLight.target.position.set(0.8, 0.5, 20);
+        car.add(rightLight);
+        car.add(rightLight.target);
+
+        scene.add(car);
+    }
+
+    function setupJoystick() {
+        const manager = nipplejs.create({
+            zone: document.getElementById('joystick-zone'),
+            mode: 'static',
+            position: { left: '50%', bottom: '50%' },
+            color: 'white'
         });
 
+        manager.on('move', (evt, data) => {
+            const angle = data.angle.radian;
+            // Up pushes Z forward (in 3D logic)
+            const forward = Math.sin(angle); 
+            const turn = Math.cos(angle);
+            
+            if(forward > 0) speed += acceleration * forward;
+            else speed += acceleration * forward; // Reverse
+
+            steering = -turn * turnSpeed;
+        });
+
+        manager.on('end', () => { steering = 0; });
+    }
+
+    function updateMinimap() {
+        // Clear minimap
+        minimapCtx.fillStyle = '#000';
+        minimapCtx.fillRect(0, 0, 150, 150);
+
+        // Map Scale (World Units to Pixel Units)
+        const mapScale = 0.5;
+        const centerX = 75; // Canvas center
+        const centerY = 75;
+
+        // Save context to rotate entire map around player
+        minimapCtx.save();
+        minimapCtx.translate(centerX, centerY);
+        minimapCtx.rotate(car.rotation.y); // Rotate map opposite to car
+        minimapCtx.translate(-centerX, -centerY);
+
+        // Draw Buildings relative to car
+        buildings.forEach(b => {
+            // Calculate relative position
+            const relX = (b.x - car.position.x) * mapScale;
+            const relZ = (car.position.z - b.z) * mapScale; // Canvas Y is inverted relative to 3D Z
+
+            // Only draw if within range
+            if(Math.abs(relX) < 80 && Math.abs(relZ) < 80) {
+                minimapCtx.fillStyle = b.type === 'park' ? '#00ff00' : '#555';
+                minimapCtx.fillRect(centerX - relX - (b.w*mapScale)/2, centerY - relZ - (b.h*mapScale)/2, b.w*mapScale, b.h*mapScale);
+            }
+        });
+
+        minimapCtx.restore();
+
+        // Draw Player (Fixed in center)
+        minimapCtx.fillStyle = '#00ffcc';
+        minimapCtx.beginPath();
+        minimapCtx.arc(centerX, centerY, 3, 0, Math.PI*2);
+        minimapCtx.fill();
+        
+        // Direction Arrow
+        minimapCtx.strokeStyle = '#fff';
+        minimapCtx.beginPath();
+        minimapCtx.moveTo(centerX, centerY - 5);
+        minimapCtx.lineTo(centerX - 3, centerY + 3);
+        minimapCtx.lineTo(centerX + 3, centerY + 3);
+        minimapCtx.closePath();
+        minimapCtx.stroke();
+    }
+
+    function startGame() {
+        document.getElementById('overlay').style.display = 'none';
+        
+        // Init Audio
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        engineOsc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        engineOsc.connect(gain);
+        gain.connect(audioCtx.destination);
+        engineOsc.frequency.value = 50;
+        gain.gain.value = 0.1;
+        engineOsc.start();
+        
+        gameActive = true;
         animate();
+    }
 
-    </script>
+    function animate() {
+        if(!gameActive) return;
+        requestAnimationFrame(animate);
+
+        // Physics
+        speed *= friction;
+        car.rotation.y += steering * Math.sign(speed);
+        car.position.x += Math.sin(car.rotation.y) * speed;
+        car.position.z += Math.cos(car.rotation.y) * speed;
+
+        // Wheels animation
+        wheels.forEach(w => w.rotation.x -= speed * 0.5);
+
+        // Camera Follow (Smooth)
+        const relOffset = new THREE.Vector3(0, 8, -15);
+        const camOffset = relOffset.applyMatrix4(car.matrixWorld);
+        camera.position.lerp(camOffset, 0.1);
+        camera.lookAt(car.position.x, car.position.y, car.position.z);
+
+        // Update Audio Pitch
+        if(audioCtx) {
+            engineOsc.frequency.setValueAtTime(50 + Math.abs(speed)*100, audioCtx.currentTime);
+        }
+
+        // Update UI
+        document.getElementById('speedometer').innerText = Math.floor(Math.abs(speed)*20) + " KM/H";
+        updateMinimap();
+
+        renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function closeGame() {
+        if(audioCtx) audioCtx.close();
+        document.getElementById('game-container').innerHTML = "<h1 style='color:white; text-align:center; margin-top:50px;'>GAME CLOSED</h1>";
+    }
+
+    init();
+
+</script>
 </body>
 </html>
