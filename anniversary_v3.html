@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Our Journey</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="heart.png">
+    <style>
+        /* Base Game Styles */
+        body { margin: 0; overflow: hidden; background: linear-gradient(to bottom, #FFC0CB, #FFB6C1, #87CEEB); font-family: 'Lato', sans-serif; user-select: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; }
+
+        /* UI ELEMENTS */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* Minimap - Mobile Optimized */
+        #minimap-container {
+            pointer-events: auto; 
+            position: absolute; top: 15px; left: 15px;
+            width: 120px; height: 120px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #b76e79; /* Muted Rose border */
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+        #minimap-container:active { transform: scale(0.95); }
+        
+        #minimap-container.map-large {
+            width: 85vmin; height: 85vmin; 
+            max-width: 400px; max-height: 400px;
+            border-radius: 12px; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%);
+            z-index: 1000; border-width: 4px;
+        }
+        #minimap-canvas { width: 100%; height: 100%; display: block; }
+
+        /* MEMORY POPUP - Classy Style */
+        #memory-popup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            background: #fff; color: #333; padding: 20px; width: 85%; max-width: 350px;
+            max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+            border-radius: 8px; text-align: center; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); 
+            z-index: 2000; pointer-events: auto; 
+            border-top: 5px solid #b76e79;
+        }
+        #memory-popup.show { transform: translate(-50%, -50%) scale(1); }
+        
+        #mem-img { width: 100%; object-fit: cover; border-radius: 4px; margin-bottom: 15px; background: #f9f9f9; }
+        
+        #memory-popup h2 { 
+            margin: 0 0 10px 0; color: #b76e79; 
+            font-family: 'Playfair Display', serif; font-size: 26px; letter-spacing: 1px;
+        }
+        #memory-popup p { 
+            font-size: 16px; line-height: 1.6; color: #555; margin-bottom: 20px; 
+            font-family: 'Lato', sans-serif; font-weight: 300;
+        }
+        
+        .btn-continue {
+            padding: 12px 30px; background: #b76e79; color: white; border: none; border-radius: 4px;
+            font-size: 14px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+            box-shadow: 0 4px 10px rgba(183, 110, 121, 0.2); transition: background 0.2s;
+        }
+        .btn-continue:active { background: #a05a65; }
+
+        /* HUD */
+        #score-box { position: absolute; top: 20px; right: 20px; text-align: right; }
+        h3 { color: #b76e79; text-shadow: 0 0 2px rgba(255,255,255,0.8); margin: 0; font-size: 18px; font-family: 'Playfair Display', serif; }
+        
+        #joystick-zone { position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; pointer-events: auto; }
+        #speedometer { position: absolute; bottom: 25px; right: 25px; font-size: 20px; font-weight: 700; color: #b76e79; font-style: italic; }
+
+        /* === ELEGANT HOMESCREEN === */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            /* Sophisticated Gradient: Soft Blush to Lavender Grey */
+            background: radial-gradient(circle at center, #fff5f7 0%, #e6e6fa 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #4a4a4a; z-index: 100; pointer-events: auto;
+            padding: 20px; box-sizing: border-box; text-align: center;
+        }
+        
+        #overlay h1 {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 3.5em; margin-bottom: 5px; margin-top: 0;
+            color: #b76e79; /* Muted Rose */
+            line-height: 1.2;
+        }
+        
+        #overlay p { 
+            font-family: 'Lato', sans-serif;
+            font-weight: 300;
+            font-size: 1.1em; 
+            margin: 10px 0; 
+            color: #666;
+            letter-spacing: 1px;
+        }
+
+        .divider {
+            width: 60px; height: 2px; background: #dcdcdc; margin: 20px auto;
+        }
+
+        .btn-start {
+            margin-top: 40px;
+            padding: 15px 40px; 
+            font-size: 16px; 
+            background: transparent; 
+            color: #b76e79;
+            border: 2px solid #b76e79; 
+            cursor: pointer; 
+            border-radius: 2px;
+            font-family: 'Lato', sans-serif; 
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-start:hover {
+            background: #b76e79;
+            color: #fff;
+        }
+        
+        .btn-start:active {
+            transform: scale(0.98);
+        }
+
+        /* Final Card */
+        #final-card {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95); z-index: 3000; flex-direction: column; justify-content: center; align-items: center;
+            color: #333; pointer-events: auto; text-align: center; overflow-y: auto; 
+        }
+        #final-card h1 { font-family: 'Playfair Display', serif; color: #b76e79; font-size: 3em; margin-bottom: 20px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        
+        <div id="memory-popup">
+            <img id="mem-img" src="" alt="Memory Photo">
+            <h2 id="mem-title">Memory</h2>
+            <p id="mem-text">...</p>
+            <button class="btn-continue" onclick="closePopup()">Continue</button>
+        </div>
+
+        <div id="final-card">
+            <img src="https://picsum.photos/id/1011/400/300" style="border-radius:8px; margin-bottom:30px; border:1px solid #ddd; max-width:80%; max-height:250px;">
+            <h1>Happy Anniversary</h1>
+            <p style="font-size: 1.2em; max-width: 600px; padding:0 20px; font-family:'Lato'; color:#666;">Thank you for every mile we've traveled together.<br>Here is to many more adventures.</p>
+            <div class="divider"></div>
+            <button class="btn-continue" onclick="location.reload()">Replay</button>
+        </div>
+
+        <div id="minimap-container" onclick="toggleMap()">
+            <canvas id="minimap-canvas"></canvas>
+            <div id="map-label" style="position:absolute; bottom:8px; width:100%; text-align:center; color:#b76e79; font-size:10px; font-weight:bold; background:rgba(255,255,255,0.8); letter-spacing:1px;">MAP</div>
+        </div>
+        
+        <div id="score-box"><h3>Memories: <span id="score">0 / 10</span></h3></div>
+        <div id="speedometer">0 <small>km/h</small></div>
+        <div id="joystick-zone"></div>
+        
+        <div id="overlay">
+            <h1>Our Journey</h1>
+            <div class="divider"></div>
+            <p>A collection of moments.</p>
+            <p style="font-size: 0.9em; margin-top: 15px; color:#888;">Follow the purple lights to begin.</p>
+            <button class="btn-start" onclick="startGame()">Begin Journey</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CONFIG = {
+        citySize: 6, blockSize: 90, roadWidth: 32, 
+        maxSpeed: 1.8, acceleration: 0.05, turnSpeed: 0.05,
+        maxImageHeight: 200
+    };
+
+    const OUR_MEMORIES = [
+        { text: "27.11.2023 - The day you poked me to tell me who I liked, poked being an understatement. The day I finally spoke it out, the day love turned tangible." },
+        { text: "26.12.2023 - Right after our not-so occasional trip to Hanuman Mandir, I just couldn't hold it in me anymore and officially asked you out✨" },
+        { text: "20.1.2024 - Right after a traumatic death scare, you make me cry like a little girl on my birthday with the sweetest little message, a 'I Love You' worth more than anything I had ever gotten", img: "https://picsum.photos/id/1011/400/300" }, // add the message's SS
+        { text: "Throughout our exams, we were each others' support system, and post one traumatic phase and before the next - we had our first date and alongside, a magical first kiss❤️", img: "https://picsum.photos/id/1016/400/300" }, //date pics
+        { text: "Our second date - that should be forgotten (THE LORE😭)"},
+        { text: "9.10.2024 - our third date - the first time I came to pick you up from Gargi (the beginning of our regular)🥰", img: "https://picsum.photos/id/1035/400/300" },
+        { text: "IDK from when but this pic is soooo us", img: "https://picsum.photos/id/1043/400/300" }, //hickey pic
+        { text: "Ended the year with a absolute blast - my baby's birthday", img: "https://picsum.photos/id/1060/400/300" }, //birthday pic
+        { text: "You rushed back home from out of town for my birthday🥹", img: "https://picsum.photos/id/1062/400/300" }, // bday photo booth
+        { text: "Just you looking fire💋💋💋", img: "https://picsum.photos/id/1069/400/300" }, //her pic
+        { text: "JThe Makeout, OMGGGG❤️‍🔥❤️‍🔥", img: "https://picsum.photos/id/1069/400/300" }, //that date
+        { text: "180 BADDIESS", img: "https://picsum.photos/id/1069/400/300" }, //180 pic
+        { text: "'Power couple definition ~Saaru'", img: "https://picsum.photos/id/1069/400/300" }, //case comp pic
+        { text: "Best day ever. Period.", img: "https://picsum.photos/id/1069/400/300" }, //that day
+        { text: "26.12.2025 - I love you more than ever - Happy Anniversary my Love!✨♾️", img: "https://picsum.photos/id/1069/400/300" } //gemini pic
+    ];
+
+    let scene, camera, renderer, car, wheels = [];
+    let speed = 0, steering = 0;
+    let keys = { w: false, a: false, s: false, d: false };
+    let buildings = [], colliders = [], parks = [];
+    let currentCpIndex = 0, cpMarker;
+    let gameActive = false, isPaused = false, isMapLarge = false;
+    let checkpoints = [];
+    let audioCtx;
+    const mapCanvas = document.getElementById('minimap-canvas');
+    const mapCtx = mapCanvas.getContext('2d');
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0xFFB6C1, 60, 450);
+
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 800);
+        camera.position.set(0, 18, -30);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('game-container').appendChild(renderer.domElement);
+
+        document.getElementById('mem-img').style.height = CONFIG.maxImageHeight + "px";
+
+        const amb = new THREE.AmbientLight(0xffffff, 0.7); scene.add(amb);
+        const sun = new THREE.DirectionalLight(0xffaa33, 0.6); 
+        sun.position.set(100, 200, 80); sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048; sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.left = -250; sun.shadow.camera.right = 250;
+        sun.shadow.camera.top = 250; sun.shadow.camera.bottom = -250;
+        scene.add(sun);
+
+        createGround();
+        createCity();
+        createCar();
+        generateCheckpoints();
+        createCheckpointMarker();
+
+        setupJoystick();
+        setupKeyboard();
+        window.addEventListener('resize', onResize);
+    }
+
+    function createGround() {
+        const g = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshStandardMaterial({ color: 0x443333 }));
+        g.rotation.x = -Math.PI/2; g.position.y = -0.1; g.receiveShadow = true; scene.add(g);
+    }
+
+    function createBuildingTexture(baseColorHex) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64; canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        const col = new THREE.Color(baseColorHex);
+        ctx.fillStyle = `rgb(${Math.floor(col.r*255)}, ${Math.floor(col.g*255)}, ${Math.floor(col.b*255)})`;
+        ctx.fillRect(0,0,64,64);
+        ctx.fillStyle = 'rgba(20,20,30,0.8)';
+        for(let y=8; y<64; y+=16) {
+            for(let x=8; x<64; x+=16) {
+                ctx.fillRect(x, y, 8, 10);
+                if(Math.random() > 0.6) {
+                    ctx.fillStyle = Math.random()>0.5 ? 'rgba(255,255,150,0.9)' : 'rgba(200,240,255,0.9)';
+                    ctx.fillRect(x, y, 8, 10);
+                    ctx.fillStyle = 'rgba(20,20,30,0.8)';
+                }
+            }
+        }
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter;
+        tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+        return tex;
+    }
+
+    function createCity() {
+        const sz = CONFIG.blockSize, bSize = sz - CONFIG.roadWidth, limit = CONFIG.citySize;
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        const matSide = new THREE.MeshStandardMaterial({ color: 0x999999 });
+        const matPark = new THREE.MeshStandardMaterial({ color: 0x66cc66 });
+        const baseColors = [0xeeeeee, 0xADD8E6, 0xF5DEB3, 0xD2B48C, 0xC0C0C0, 0x87CEFA, 0xFFB6C1];
+        const baseTextures = baseColors.map(c => createBuildingTexture(c));
+
+        for(let x = -limit; x <= limit; x++) {
+            for(let z = -limit; z <= limit; z++) {
+                if(Math.abs(x) <= 1 && Math.abs(z) <= 1) continue; 
+                const cx = x * sz, cz = z * sz;
+                const sw = new THREE.Mesh(boxGeo, matSide);
+                sw.position.set(cx, 0.15, cz); sw.scale.set(bSize, 0.3, bSize); sw.receiveShadow = true; scene.add(sw);
+
+                if(Math.random() > 0.7) {
+                    const pk = new THREE.Mesh(boxGeo, matPark);
+                    pk.position.set(cx, 0.31, cz); pk.scale.set(bSize-2, 0.1, bSize-2); pk.receiveShadow = true; scene.add(pk);
+                    parks.push({x: cx, z: cz, s: bSize});
+                    
+                    for(let k=0; k<3; k++) {
+                        const tx = cx + (Math.random()-0.5)*(bSize-8);
+                        const tz = cz + (Math.random()-0.5)*(bSize-8);
+                        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.5,7.5), new THREE.MeshStandardMaterial({color:0x5D4037}));
+                        trunk.position.set(tx, 3.75, tz); trunk.castShadow = true; scene.add(trunk);
+                        const leaf = new THREE.Mesh(new THREE.ConeGeometry(7.5, 15, 8), new THREE.MeshStandardMaterial({color:0x228B22}));
+                        leaf.position.set(tx, 15, tz); leaf.castShadow = true; scene.add(leaf);
+                    }
+                    const bbox = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(cx, 1, cz), new THREE.Vector3(bSize, 5, bSize));
+                    colliders.push(bbox);
+                } else {
+                    const h = 25 + Math.random() * 50;
+                    const w = bSize - Math.random()*4;
+                    const tex = baseTextures[Math.floor(Math.random()*baseTextures.length)].clone();
+                    tex.needsUpdate = true;
+                    tex.repeat.set(1, h / 10);
+                    const mat = new THREE.MeshStandardMaterial({ map: tex });
+                    
+                    const b = new THREE.Mesh(boxGeo, mat);
+                    b.position.set(cx, h/2+0.3, cz); b.scale.set(w, h, w); b.castShadow = true; b.receiveShadow = true; scene.add(b);
+                    const bbox = new THREE.Box3().setFromObject(b); bbox.expandByScalar(2);
+                    colliders.push(bbox);
+                    buildings.push({x: cx, z: cz, s: w});
+                }
+            }
+        }
+    }
+
+    function createCar() {
+        car = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xFF0055, metalness: 0.6, roughness: 0.2 }); 
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(2, 0.7, 4.4), bodyMat);
+        chassis.position.y = 0.7; chassis.castShadow = true; car.add(chassis);
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 2.2), new THREE.MeshStandardMaterial({color:0x111111}));
+        cabin.position.set(0, 1.3, -0.4); car.add(cabin);
+        const wGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.35, 24);
+        [[-1.1, 1.3], [1.1, 1.3], [-1.1, -1.3], [1.1, -1.3]].forEach(p => {
+            const w = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({color:0x222}));
+            w.rotation.z = Math.PI/2; w.position.set(p[0], 0.4, p[1]); w.castShadow = true;
+            car.add(w); wheels.push(w);
+        });
+        car.scale.set(1.8, 1.8, 1.8);
+        scene.add(car);
+    }
+
+    function generateCheckpoints() {
+        checkpoints = [];
+        for(let i=0; i<OUR_MEMORIES.length; i++) {
+            let rx, rz, valid = false, attempts = 0;
+            while(!valid && attempts < 100) {
+                attempts++;
+                let bx = Math.floor((Math.random()-0.5) * CONFIG.citySize * 2);
+                let bz = Math.floor((Math.random()-0.5) * CONFIG.citySize * 2);
+                rx = (bx * CONFIG.blockSize) + (CONFIG.blockSize / 2);
+                rz = (bz * CONFIG.blockSize) + (CONFIG.blockSize / 2);
+                if(Math.abs(rx) > 60 || Math.abs(rz) > 60) valid = true;
+            }
+            checkpoints.push({x: rx, z: rz});
+        }
+    }
+
+    function createCheckpointMarker() {
+        const geo = new THREE.CylinderGeometry(2, 2, 250, 16, 1, true); 
+        const mat = new THREE.MeshBasicMaterial({ color: 0xff69b4, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
+        cpMarker = new THREE.Mesh(geo, mat); scene.add(cpMarker); updateCpVisuals();
+    }
+
+    function initAudio() { const AC = window.AudioContext || window.webkitAudioContext; audioCtx = new AC(); }
+    
+    function playChime() {
+        if(!audioCtx) return;
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+        osc.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.1); 
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+        osc.start(); osc.stop(audioCtx.currentTime + 1);
+    }
+
+    function playWinMusic() {
+        if(!audioCtx) return;
+        const now = audioCtx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((f, i) => {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.value = f; osc.start(now + i*0.2);
+            gain.gain.setValueAtTime(0.1, now + i*0.2); gain.gain.exponentialRampToValueAtTime(0.01, now + i*0.2 + 1);
+            osc.stop(now + i*0.2 + 1);
+        });
+    }
+
+    function updatePhysics() {
+        if(isPaused) return;
+        if (keys.a) steering = CONFIG.turnSpeed; else if (keys.d) steering = -CONFIG.turnSpeed; else if (Math.abs(steering) === CONFIG.turnSpeed) steering = 0;
+        if(keys.w) speed += CONFIG.acceleration; if(keys.s) speed -= CONFIG.acceleration;
+        if(!keys.w && !keys.s) speed *= 0.96;
+        speed = Math.max(Math.min(speed, CONFIG.maxSpeed), -CONFIG.maxSpeed/2);
+        
+        if(Math.abs(speed) > 0.1) car.rotation.y += steering * Math.sign(speed);
+        
+        const nextX = car.position.x + Math.sin(car.rotation.y) * speed;
+        const nextZ = car.position.z + Math.cos(car.rotation.y) * speed;
+        
+        let hit = false;
+        const carBox = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(nextX, 2, nextZ), new THREE.Vector3(3.6, 4, 7.5));
+        for(let box of colliders) {
+            if(Math.abs(box.min.x - nextX) > 80) continue;
+            if(carBox.intersectsBox(box)) { hit = true; break; }
+        }
+
+        if(hit) speed = -speed * 0.5; else { car.position.x = nextX; car.position.z = nextZ; }
+
+        wheels.forEach(w => w.rotation.x -= speed * 0.5);
+
+        const off = new THREE.Vector3(0, 18, -30).applyMatrix4(car.matrixWorld);
+        camera.position.lerp(off, 0.12); camera.lookAt(car.position.x, car.position.y + 3, car.position.z);
+
+        if(currentCpIndex < checkpoints.length) {
+            const t = checkpoints[currentCpIndex];
+            const dist = Math.sqrt((t.x - car.position.x)**2 + (t.z - car.position.z)**2);
+            if(dist < 18) triggerMemory();
+        }
+    }
+
+    function toggleMap() {
+        const c = document.getElementById('minimap-container');
+        const l = document.getElementById('map-label');
+        isMapLarge = !isMapLarge;
+        if(isMapLarge) { c.classList.add('map-large'); l.innerText = "TAP TO CLOSE"; }
+        else { c.classList.remove('map-large'); l.innerText = "MAP"; }
+    }
+
+    function drawMinimap() {
+        const size = isMapLarge ? Math.min(window.innerWidth, window.innerHeight)*0.9 : 120;
+        if(mapCanvas.width !== size) { mapCanvas.width = size; mapCanvas.height = size; }
+
+        mapCtx.fillStyle = '#fff0f5'; mapCtx.fillRect(0,0,size,size);
+        const cx = size/2;
+        const cityWidth = CONFIG.citySize * CONFIG.blockSize * 2.2;
+        const scale = isMapLarge ? (size / cityWidth) : 0.25;
+
+        mapCtx.save();
+        if(isMapLarge) { mapCtx.translate(cx, cx); } 
+        else { mapCtx.translate(cx, cx); mapCtx.rotate(car.rotation.y); mapCtx.translate(-car.position.x*scale, car.position.z*scale); }
+
+        mapCtx.fillStyle = '#aaa';
+        buildings.forEach(b => { mapCtx.fillRect(b.x*scale - (b.s*scale)/2, -b.z*scale - (b.s*scale)/2, b.s*scale, b.s*scale); });
+        
+        mapCtx.fillStyle = '#66cc66';
+        parks.forEach(p => { mapCtx.fillRect(p.x*scale - (p.s*scale)/2, -p.z*scale - (p.s*scale)/2, p.s*scale, p.s*scale); });
+
+        if(currentCpIndex < checkpoints.length) {
+            const t = checkpoints[currentCpIndex];
+            mapCtx.fillStyle = '#ff1493';
+            mapCtx.beginPath(); mapCtx.arc(t.x*scale, -t.z*scale, isMapLarge?10:6, 0, Math.PI*2); mapCtx.fill();
+        }
+
+        mapCtx.restore();
+
+        if(isMapLarge) {
+            const px = cx + car.position.x * scale;
+            const py = cx - car.position.z * scale;
+            mapCtx.fillStyle = 'red'; mapCtx.beginPath(); mapCtx.arc(px, py, 6, 0, Math.PI*2); mapCtx.fill();
+            mapCtx.save(); mapCtx.translate(px, py); mapCtx.rotate(-car.rotation.y);
+            mapCtx.beginPath(); mapCtx.moveTo(0,-9); mapCtx.lineTo(-5,5); mapCtx.lineTo(5,5); mapCtx.fillStyle='red'; mapCtx.fill(); mapCtx.restore();
+        } else {
+            mapCtx.fillStyle = 'red'; mapCtx.beginPath(); mapCtx.arc(cx, cx, 5, 0, Math.PI*2); mapCtx.fill();
+            mapCtx.beginPath(); mapCtx.moveTo(cx, cx-9); mapCtx.lineTo(cx-5, cx); mapCtx.lineTo(cx+5, cx); mapCtx.fillStyle='#333'; mapCtx.fill();
+            
+            if(currentCpIndex < checkpoints.length) {
+                const t = checkpoints[currentCpIndex];
+                const dx = t.x - car.position.x; const dz = -(t.z - car.position.z);
+                const angle = Math.atan2(dx, dz) - car.rotation.y;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                if(dist > 150) {
+                    mapCtx.save(); mapCtx.translate(cx, cx); mapCtx.rotate(angle); mapCtx.translate(0, -cx + 10);
+                    mapCtx.fillStyle = '#ff1493'; mapCtx.beginPath(); mapCtx.moveTo(0,-5); mapCtx.lineTo(-5,5); mapCtx.lineTo(5,5); mapCtx.fill(); mapCtx.restore();
+                }
+            }
+        }
+    }
+
+    function setupJoystick() {
+        const mgr = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: { left: '50%', bottom: '50%' }, color: 'white', size: 120 });
+        mgr.on('move', (evt, data) => {
+            if(isPaused) return;
+            const f = data.vector.y; const t = data.vector.x;
+            if(f > 0.1) speed += CONFIG.acceleration * Math.min(data.force, 2);
+            else if(f < -0.1) speed -= CONFIG.acceleration * Math.min(data.force, 2);
+            steering = -t * CONFIG.turnSpeed;
+        });
+        mgr.on('end', () => { steering = 0; });
+    }
+
+    function setupKeyboard() {
+        window.addEventListener('keydown', e => { const k=e.key.toLowerCase(); if(k==='w'||k==='arrowup')keys.w=true; if(k==='s'||k==='arrowdown')keys.s=true; if(k==='a'||k==='arrowleft')keys.a=true; if(k==='d'||k==='arrowright')keys.d=true; });
+        window.addEventListener('keyup', e => { const k=e.key.toLowerCase(); if(k==='w'||k==='arrowup')keys.w=false; if(k==='s'||k==='arrowdown')keys.s=false; if(k==='a'||k==='arrowleft')keys.a=false; if(k==='d'||k==='arrowright')keys.d=false; });
+    }
+
+    function triggerMemory() {
+        isPaused = true; speed = 0;
+        playChime();
+        if(currentCpIndex === OUR_MEMORIES.length - 1) {
+            playWinMusic();
+            document.getElementById('final-card').style.display = "flex";
+            document.getElementById('ui-layer').style.pointerEvents = "auto";
+        } else {
+            const mem = OUR_MEMORIES[currentCpIndex];
+            document.getElementById('mem-title').innerText = "Memory #" + (currentCpIndex + 1);
+            document.getElementById('mem-text').innerText = mem.text;
+            document.getElementById('mem-img').src = mem.img;
+            document.getElementById('memory-popup').classList.add('show');
+        }
+    }
+
+    function closePopup() {
+        document.getElementById('memory-popup').classList.remove('show');
+        currentCpIndex++;
+        document.getElementById('score').innerText = currentCpIndex + " / " + OUR_MEMORIES.length;
+        if(currentCpIndex < checkpoints.length) {
+            cpMarker.position.set(checkpoints[currentCpIndex].x, 0, checkpoints[currentCpIndex].z);
+            isPaused = false;
+        } else { cpMarker.visible = false; }
+    }
+
+    function updateCpVisuals() { if(currentCpIndex < checkpoints.length) cpMarker.position.set(checkpoints[currentCpIndex].x, 0, checkpoints[currentCpIndex].z); }
+    
+    // START AND FORCE FULL SCREEN
+    function startGame() { 
+        document.getElementById('overlay').style.display = 'none'; 
+        initAudio(); 
+        
+        // Attempt Fullscreen
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) elem.requestFullscreen();
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        
+        gameActive = true; 
+        animate(); 
+    }
+    
+    function onResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+    function animate() { if(gameActive) { requestAnimationFrame(animate); updatePhysics(); drawMinimap(); document.getElementById('speedometer').innerHTML = Math.floor(Math.abs(speed)*30) + " <small>km/h</small>"; renderer.render(scene, camera); } }
+
+    init();
+</script>
+</body>
+</html>
